@@ -1,14 +1,17 @@
-# Use official Python image
 FROM python:3.11-slim
 
 # Set working directory
 WORKDIR /app
 
-# Copy ETL code
-COPY . /app
+# Install system dependencies for psycopg2 if needed (slim versions often need these)
+RUN apt-get update && apt-get install -y libpq-dev gcc && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies
-RUN pip install --no-cache-dir requests psycopg2-binary
+# Copy requirements and install
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Default command: run the ETL script
-CMD ["python", "apiDataLoader.py"]
+# Copy the ETL script
+COPY main.py .
+
+# Run the script
+CMD ["python", "main.py"]

@@ -1,0 +1,30 @@
+<Schema name="WeatherDW">
+  <Cube name="Weather">
+    <Table name="fact_weather"/>
+
+    <Dimension name="Date" foreignKey="date_key">
+      <Hierarchy hasAll="true" primaryKey="date_key">
+        <Table name="dim_date"/>
+        <Level name="Year" column="year" uniqueMembers="true"/>
+        <Level name="Month" column="month" uniqueMembers="false"/>
+        <Level name="Day" column="day" uniqueMembers="false"/>
+      </Hierarchy>
+    </Dimension>
+
+    <Dimension name="Location" foreignKey="location_key">
+      <Hierarchy hasAll="true" primaryKey="location_key">
+        <Table name="dim_location"/>
+        <Level name="Location" column="location" uniqueMembers="true"/>
+      </Hierarchy>
+    </Dimension>
+
+    <Dimension name="Metric" foreignKey="metric_key">
+      <Hierarchy hasAll="true" primaryKey="metric_key">
+        <Table name="dim_metric"/>
+        <Level name="Metric" column="metric_name" uniqueMembers="true"/>
+      </Hierarchy>
+    </Dimension>
+
+    <Measure name="Observation Value" column="value" aggregator="avg" formatString="###.00"/>
+  </Cube>
+</Schema>

@@ -1,73 +1,58 @@
 version: "3.9"
 
 services:
-  postgres:
+  dw_postgres:
     image: postgres:15
-    container_name: postgres15
-    restart: unless-stopped
+    container_name: dw_postgres
+    env_file: .env
     environment:
-      POSTGRES_DB: mydb
-      POSTGRES_USER: myuser
-      POSTGRES_PASSWORD: mypassword
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${DW_DB}
+      POSTGRES_USER: ${DW_USER}
+      POSTGRES_PASSWORD: ${DW_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./ETL/schema.sql:/docker-entrypoint-initdb.d/schema.sql
-
-  superset:
-    image: apache/superset:latest
-    container_name: superset
-    restart: unless-stopped
-    depends_on:
-      - postgres
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
-      - "8088:8088"
-    environment:
-      SUPERSET_SECRET_KEY: supersecretkey
-      DATABASE_DB: superset
-      DATABASE_USER: myuser
-      DATABASE_PASSWORD: mypassword
-      DATABASE_HOST: postgres
-      DATABASE_PORT: 5432
-    volumes:
-      - superset_data:/app/superset_home
-    command:
-      - /bin/sh
-      - -c
-      - |
-        superset db upgrade &&
-        superset fab create-admin \
-          --username admin \
-          --firstname Admin \
-          --lastname User \
-          --email admin@superset.com \
-          --password admin &&
-        superset init &&
-        superset run -h 0.0.0.0 -p 8088
-      
-  python:
-    build:
-      context: ./ETL
-      dockerfile: Dockerfile
-    container_name: python_app
-    working_dir: /app
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DW_USER} -d ${DW_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  python_etl:
+    build: ./etl
+    container_name: python_etl
+    env_file: .env
     depends_on:
-      - postgres
+      dw_postgres:
+        condition: service_healthy
+
 
   mondrian:
     image: devopsappwilio/mondrian
     container_name: mondrian
-    restart: unless-stopped
-    depends_on:
-      - postgres
+    volumes:
+      - ./mondrian:/schema
     ports:
-      - "8080:8080"
-    environment:
-      MONDRIAN_JDBC_URL: jdbc:postgresql://postgres:5432/mydb
-      MONDRIAN_JDBC_USER: myuser
-      MONDRIAN_JDBC_PASSWORD: mypassword
+      - "8081:8080"
+    depends_on:
+      dw_postgres:
+        condition: service_healthy
+
+  superset:
+    image: apache/superset:3.0.1
+    container_name: superset
+    env_file: .env
+    volumes:
+      - ./superset/superset_config.py:/app/pythonpath/superset_config.py
+      - superset_home:/app/superset_home
+    ports:
+      - "8088:8088"
+    depends_on:
+      dw_postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:
-  superset_data:
+  superset_home:
